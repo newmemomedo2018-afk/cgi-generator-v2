@@ -1,7 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 
 export default async function handler(req, res) {
-  // Handle CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -30,7 +29,6 @@ export default async function handler(req, res) {
 
     const user = users[0];
     
-    // For now, simple password check (later we'll add bcrypt)
     if (password === 'admin123') {
       return res.json({
         success: true,
@@ -40,7 +38,7 @@ export default async function handler(req, res) {
           credits: user.credits,
           isAdmin: user.is_admin
         },
-        token: 'jwt-token-placeholder'
+        auth_token: 'jwt-token-placeholder'
       });
     } else {
       return res.status(401).json({ error: 'Invalid credentials' });
