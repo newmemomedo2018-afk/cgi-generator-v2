@@ -164,7 +164,7 @@ export default function Pricing() {
                   لوحة التحكم
                 </Button>
               ) : (
-                <Button onClick={() => window.location.href = "/api/login"} className="gradient-button">
+                <Button onClick={() => window.location.href = "/"} className="gradient-button">
                   تسجيل الدخول
                 </Button>
               )}
