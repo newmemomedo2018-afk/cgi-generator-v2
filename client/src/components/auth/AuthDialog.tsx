@@ -15,6 +15,8 @@ export function AuthDialog({ children, defaultTab = "login" }: AuthDialogProps) 
 
   const handleSuccess = () => {
     setOpen(false);
+    // Redirect to dashboard after successful login/register
+    window.location.href = "/dashboard";
   };
 
   const switchToLogin = () => setActiveTab("login");
