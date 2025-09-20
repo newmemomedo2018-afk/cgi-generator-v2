@@ -1,2 +1,3 @@
-# cgi-generator-v2
-CGI Generator SaaS Platform - Fresh Deployment
+# CGI Generator SaaS Platform
+
+Professional CGI images and videos using AI technology
