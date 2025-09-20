@@ -13,6 +13,13 @@ async function connectToDatabase() {
 }
 
 export default async function handler(req, res) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -29,6 +36,10 @@ export default async function handler(req, res) {
     }
 
     const { email, password, name } = body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
 
     const client = await connectToDatabase();
     const db = client.db('cgi-generator');
@@ -48,8 +59,9 @@ export default async function handler(req, res) {
       email,
       password: hashedPassword,
       name: name || email.split('@')[0],
-      credits: 5, // 5 free credits
+      credits: 5,
       createdAt: new Date(),
+      updatedAt: new Date(),
       isAdmin: false
     });
 
@@ -65,6 +77,7 @@ export default async function handler(req, res) {
       user: {
         id: result.insertedId.toString(),
         email,
+        name: name || email.split('@')[0],
         credits: 5
       }
     });
