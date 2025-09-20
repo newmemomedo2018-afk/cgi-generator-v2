@@ -1,11 +1,34 @@
-export default function handler(req, res) {
+export default async function handler(req, res) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Parse request body manually for Vercel serverless
+  let body = {};
+  try {
+    if (typeof req.body === 'string') {
+      body = JSON.parse(req.body);
+    } else {
+      body = req.body || {};
+    }
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid JSON body' });
+  }
+
+  const { email, password } = body;
   
-  const { email, password } = req.body;
+  console.log('Login attempt:', { email, password }); // Debug log
   
-  // Mock authentication - في الواقع هنا هنتحقق من database
+  // Mock authentication
   if (email === 'admin@test.com' && password === 'password') {
     return res.status(200).json({
       success: true,
