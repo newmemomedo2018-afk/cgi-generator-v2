@@ -4,19 +4,16 @@ export default async function handler(req, res) {
   try {
     const sql = neon(process.env.DATABASE_URL);
     
-    // Enable UUID extension first
-    await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
-    
-    // 1. Users Table
+    // 1. Users Table (بدون UUID defaults في البداية)
     await sql`
       CREATE TABLE IF NOT EXISTS users (
-        id VARCHAR DEFAULT uuid_generate_v4() PRIMARY KEY,
+        id VARCHAR PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
         first_name VARCHAR(255),
         last_name VARCHAR(255),
         profile_image_url VARCHAR(500),
-        credits INTEGER DEFAULT 5 NOT NULL,
+        credits INTEGER DEFAULT 5,
         is_admin BOOLEAN DEFAULT FALSE,
         stripe_customer_id VARCHAR(255),
         stripe_subscription_id VARCHAR(255),
@@ -28,7 +25,7 @@ export default async function handler(req, res) {
     // 2. Projects Table
     await sql`
       CREATE TABLE IF NOT EXISTS projects (
-        id VARCHAR DEFAULT uuid_generate_v4() PRIMARY KEY,
+        id VARCHAR PRIMARY KEY,
         user_id VARCHAR NOT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT,
@@ -43,7 +40,7 @@ export default async function handler(req, res) {
         output_image_url VARCHAR(500),
         output_video_url VARCHAR(500),
         credits_used INTEGER NOT NULL,
-        actual_cost INTEGER DEFAULT 0 NOT NULL,
+        actual_cost INTEGER DEFAULT 0,
         resolution VARCHAR(50) DEFAULT '1024x1024',
         quality VARCHAR(50) DEFAULT 'standard',
         error_message TEXT,
@@ -59,7 +56,7 @@ export default async function handler(req, res) {
     // 3. Transactions Table
     await sql`
       CREATE TABLE IF NOT EXISTS transactions (
-        id VARCHAR DEFAULT uuid_generate_v4() PRIMARY KEY,
+        id VARCHAR PRIMARY KEY,
         user_id VARCHAR NOT NULL,
         amount INTEGER NOT NULL,
         credits INTEGER NOT NULL,
@@ -74,15 +71,15 @@ export default async function handler(req, res) {
     // 4. Job Queue Table
     await sql`
       CREATE TABLE IF NOT EXISTS job_queue (
-        id VARCHAR DEFAULT uuid_generate_v4() PRIMARY KEY,
+        id VARCHAR PRIMARY KEY,
         type VARCHAR(100) NOT NULL,
         status VARCHAR(50) DEFAULT 'pending',
         project_id VARCHAR NOT NULL,
         user_id VARCHAR NOT NULL,
-        priority INTEGER DEFAULT 0 NOT NULL,
-        attempts INTEGER DEFAULT 0 NOT NULL,
-        max_attempts INTEGER DEFAULT 3 NOT NULL,
-        progress INTEGER DEFAULT 0 NOT NULL,
+        priority INTEGER DEFAULT 0,
+        attempts INTEGER DEFAULT 0,
+        max_attempts INTEGER DEFAULT 3,
+        progress INTEGER DEFAULT 0,
         status_message TEXT,
         error_message TEXT,
         data JSONB,
@@ -129,22 +126,16 @@ export default async function handler(req, res) {
       FOREIGN KEY (project_id) REFERENCES projects(id)
     `;
 
-    // Create indexes
-    await sql`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_job_queue_status ON job_queue(status)`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions(expire)`;
-
-    // Create admin user
+    // Create admin user (with manual UUID)
     const adminExists = await sql`SELECT id FROM users WHERE email = 'admin@cgi-generator.com'`;
     if (adminExists.length === 0) {
       const bcrypt = await import('bcrypt');
       const hashedPassword = await bcrypt.hash('admin123', 12);
+      const adminId = 'admin-' + Date.now();
       
       await sql`
-        INSERT INTO users (email, password, first_name, credits, is_admin)
-        VALUES ('admin@cgi-generator.com', ${hashedPassword}, 'Admin', 1000, TRUE)
+        INSERT INTO users (id, email, password, first_name, credits, is_admin)
+        VALUES (${adminId}, 'admin@cgi-generator.com', ${hashedPassword}, 'Admin', 1000, TRUE)
       `;
     }
 
