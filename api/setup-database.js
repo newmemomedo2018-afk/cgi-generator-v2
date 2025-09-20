@@ -4,10 +4,13 @@ export default async function handler(req, res) {
   try {
     const sql = neon(process.env.DATABASE_URL);
     
-    // 1. Users Table أولاً (مفيش dependencies)
+    // Enable UUID extension first
+    await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+    
+    // 1. Users Table
     await sql`
       CREATE TABLE IF NOT EXISTS users (
-        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        id VARCHAR DEFAULT uuid_generate_v4() PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
         first_name VARCHAR(255),
@@ -17,15 +20,15 @@ export default async function handler(req, res) {
         is_admin BOOLEAN DEFAULT FALSE,
         stripe_customer_id VARCHAR(255),
         stripe_subscription_id VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       )
     `;
 
-    // 2. Projects Table (يعتمد على users)
+    // 2. Projects Table
     await sql`
       CREATE TABLE IF NOT EXISTS projects (
-        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        id VARCHAR DEFAULT uuid_generate_v4() PRIMARY KEY,
         user_id VARCHAR NOT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT,
@@ -48,30 +51,30 @@ export default async function handler(req, res) {
         kling_sound_task_id VARCHAR(255),
         include_audio BOOLEAN DEFAULT FALSE,
         full_task_details JSONB,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       )
     `;
 
-    // 3. Transactions Table (يعتمد على users)
+    // 3. Transactions Table
     await sql`
       CREATE TABLE IF NOT EXISTS transactions (
-        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        id VARCHAR DEFAULT uuid_generate_v4() PRIMARY KEY,
         user_id VARCHAR NOT NULL,
         amount INTEGER NOT NULL,
         credits INTEGER NOT NULL,
         stripe_payment_intent_id VARCHAR(255) UNIQUE,
         status VARCHAR(50) DEFAULT 'pending',
         processed_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       )
     `;
 
-    // 4. Job Queue Table (يعتمد على users و projects)
+    // 4. Job Queue Table
     await sql`
       CREATE TABLE IF NOT EXISTS job_queue (
-        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        id VARCHAR DEFAULT uuid_generate_v4() PRIMARY KEY,
         type VARCHAR(100) NOT NULL,
         status VARCHAR(50) DEFAULT 'pending',
         project_id VARCHAR NOT NULL,
@@ -84,15 +87,15 @@ export default async function handler(req, res) {
         error_message TEXT,
         data JSONB,
         result JSONB,
-        scheduled_for TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        scheduled_for TIMESTAMP DEFAULT NOW(),
         started_at TIMESTAMP,
         completed_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       )
     `;
 
-    // 5. Sessions Table (مستقل)
+    // 5. Sessions Table
     await sql`
       CREATE TABLE IF NOT EXISTS sessions (
         sid VARCHAR PRIMARY KEY,
@@ -101,7 +104,7 @@ export default async function handler(req, res) {
       )
     `;
 
-    // إضافة foreign key constraints بعد إنشاء كل الجداول
+    // Add foreign key constraints
     await sql`
       ALTER TABLE projects 
       ADD CONSTRAINT IF NOT EXISTS fk_projects_user_id 
