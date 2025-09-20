@@ -1,20 +1,3 @@
-import { MongoClient } from 'mongodb';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-
-let cachedClient = null;
-
-async function connectToDatabase() {
-  if (cachedClient) {
-    return cachedClient;
-  }
-
-  const client = new MongoClient(process.env.MONGODB_URI);
-  await client.connect();
-  cachedClient = client;
-  return client;
-}
-
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -31,6 +14,10 @@ export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
 
   try {
+    const { MongoClient } = await import('mongodb');
+    const bcrypt = await import('bcrypt');
+    const jwt = await import('jsonwebtoken');
+
     let body = {};
     if (typeof req.body === 'string') {
       body = JSON.parse(req.body);
@@ -40,18 +27,31 @@ export default async function handler(req, res) {
 
     const { email, password } = body;
 
-    const client = await connectToDatabase();
+    // Fix SSL connection with proper options
+    const client = new MongoClient(process.env.MONGODB_URI, {
+      tls: true,
+      tlsInsecure: false,
+      tlsAllowInvalidCertificates: false,
+      tlsAllowInvalidHostnames: false,
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+      maxPoolSize: 1
+    });
+
+    await client.connect();
     const db = client.db('cgi-generator');
     const users = db.collection('users');
     
     const user = await users.findOne({ email });
     
     if (!user) {
+      await client.close();
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
+      await client.close();
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -60,6 +60,8 @@ export default async function handler(req, res) {
       process.env.JWT_SECRET || 'fallback-secret',
       { expiresIn: '7d' }
     );
+
+    await client.close();
 
     return res.status(200).json({
       token,
@@ -72,6 +74,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Login error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error: ' + error.message });
   }
 }
