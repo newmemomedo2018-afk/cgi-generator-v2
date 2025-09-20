@@ -4,10 +4,10 @@ export default async function handler(req, res) {
   try {
     const sql = neon(process.env.DATABASE_URL);
     
-    // 1. Users Table (بدون UUID defaults في البداية)
+    // 1. Users Table - بطريقة Neon المدعومة
     await sql`
       CREATE TABLE IF NOT EXISTS users (
-        id VARCHAR PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
         first_name VARCHAR(255),
@@ -25,8 +25,8 @@ export default async function handler(req, res) {
     // 2. Projects Table
     await sql`
       CREATE TABLE IF NOT EXISTS projects (
-        id VARCHAR PRIMARY KEY,
-        user_id VARCHAR NOT NULL,
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT,
         product_image_url VARCHAR(500) NOT NULL,
@@ -56,8 +56,8 @@ export default async function handler(req, res) {
     // 3. Transactions Table
     await sql`
       CREATE TABLE IF NOT EXISTS transactions (
-        id VARCHAR PRIMARY KEY,
-        user_id VARCHAR NOT NULL,
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
         amount INTEGER NOT NULL,
         credits INTEGER NOT NULL,
         stripe_payment_intent_id VARCHAR(255) UNIQUE,
@@ -71,11 +71,11 @@ export default async function handler(req, res) {
     // 4. Job Queue Table
     await sql`
       CREATE TABLE IF NOT EXISTS job_queue (
-        id VARCHAR PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         type VARCHAR(100) NOT NULL,
         status VARCHAR(50) DEFAULT 'pending',
-        project_id VARCHAR NOT NULL,
-        user_id VARCHAR NOT NULL,
+        project_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
         priority INTEGER DEFAULT 0,
         attempts INTEGER DEFAULT 0,
         max_attempts INTEGER DEFAULT 3,
@@ -101,41 +101,40 @@ export default async function handler(req, res) {
       )
     `;
 
-    // Add foreign key constraints
-    await sql`
-      ALTER TABLE projects 
-      ADD CONSTRAINT IF NOT EXISTS fk_projects_user_id 
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    `;
+    // Add foreign keys separately
+    try {
+      await sql`ALTER TABLE projects ADD CONSTRAINT fk_projects_user_id FOREIGN KEY (user_id) REFERENCES users(id)`;
+    } catch (e) {
+      // Foreign key might already exist
+    }
 
-    await sql`
-      ALTER TABLE transactions 
-      ADD CONSTRAINT IF NOT EXISTS fk_transactions_user_id 
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    `;
+    try {
+      await sql`ALTER TABLE transactions ADD CONSTRAINT fk_transactions_user_id FOREIGN KEY (user_id) REFERENCES users(id)`;
+    } catch (e) {
+      // Foreign key might already exist
+    }
 
-    await sql`
-      ALTER TABLE job_queue 
-      ADD CONSTRAINT IF NOT EXISTS fk_job_queue_user_id 
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    `;
+    try {
+      await sql`ALTER TABLE job_queue ADD CONSTRAINT fk_job_queue_user_id FOREIGN KEY (user_id) REFERENCES users(id)`;
+    } catch (e) {
+      // Foreign key might already exist
+    }
 
-    await sql`
-      ALTER TABLE job_queue 
-      ADD CONSTRAINT IF NOT EXISTS fk_job_queue_project_id 
-      FOREIGN KEY (project_id) REFERENCES projects(id)
-    `;
+    try {
+      await sql`ALTER TABLE job_queue ADD CONSTRAINT fk_job_queue_project_id FOREIGN KEY (project_id) REFERENCES projects(id)`;
+    } catch (e) {
+      // Foreign key might already exist
+    }
 
-    // Create admin user (with manual UUID)
+    // Create admin user
     const adminExists = await sql`SELECT id FROM users WHERE email = 'admin@cgi-generator.com'`;
     if (adminExists.length === 0) {
       const bcrypt = await import('bcrypt');
       const hashedPassword = await bcrypt.hash('admin123', 12);
-      const adminId = 'admin-' + Date.now();
       
       await sql`
-        INSERT INTO users (id, email, password, first_name, credits, is_admin)
-        VALUES (${adminId}, 'admin@cgi-generator.com', ${hashedPassword}, 'Admin', 1000, TRUE)
+        INSERT INTO users (email, password, first_name, credits, is_admin)
+        VALUES ('admin@cgi-generator.com', ${hashedPassword}, 'Admin', 1000, TRUE)
       `;
     }
 
