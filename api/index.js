@@ -1,14 +1,24 @@
 export default function handler(req, res) {
-  // Handle all API requests here
-  if (req.url === '/api/test') {
-    return res.json({ message: 'Test working!' });
+  res.setHeader('Content-Type', 'application/json');
+  
+  if (req.url.includes('/api/test')) {
+    return res.status(200).json({ 
+      success: true,
+      message: 'Test working!',
+      timestamp: new Date().toISOString()
+    });
   }
   
-  if (req.url === '/api/auth/login' && req.method === 'POST') {
-    return res.json({ message: 'Login working!' });
+  if (req.url.includes('/api/auth/login')) {
+    return res.status(200).json({ 
+      success: true,
+      message: 'Login endpoint working',
+      method: req.method
+    });
   }
   
-  res.json({ 
+  return res.status(200).json({ 
+    success: true,
     message: 'API working!',
     path: req.url,
     method: req.method 
