@@ -1,10 +1,19 @@
-import { Pool } from '@neondatabase/serverless';
+import { MongoClient } from 'mongodb';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL
-});
+let cachedClient = null;
+
+async function connectToDatabase() {
+  if (cachedClient) {
+    return cachedClient;
+  }
+
+  const client = new MongoClient(process.env.MONGODB_URI);
+  await client.connect();
+  cachedClient = client;
+  return client;
+}
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -31,24 +40,23 @@ export default async function handler(req, res) {
 
     const { email, password } = body;
 
-    // Query the actual database
-    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const client = await connectToDatabase();
+    const db = client.db('cgi-generator');
+    const users = db.collection('users');
     
-    if (result.rows.length === 0) {
+    const user = await users.findOne({ email });
+    
+    if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const user = result.rows[0];
-    
-    // Check password
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user._id.toString(), email: user.email },
       process.env.JWT_SECRET || 'fallback-secret',
       { expiresIn: '7d' }
     );
@@ -56,7 +64,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       token,
       user: {
-        id: user.id,
+        id: user._id.toString(),
         email: user.email,
         credits: user.credits || 0
       }
