@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   try {
     const sql = neon(process.env.DATABASE_URL);
     
-    // 1. Users Table - إدارة المستخدمين والأرصدة
+    // 1. Users Table أولاً (مفيش dependencies)
     await sql`
       CREATE TABLE IF NOT EXISTS users (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -22,19 +22,19 @@ export default async function handler(req, res) {
       )
     `;
 
-    // 2. Projects Table - مشاريع CGI
+    // 2. Projects Table (يعتمد على users)
     await sql`
       CREATE TABLE IF NOT EXISTS projects (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id VARCHAR NOT NULL REFERENCES users(id),
+        user_id VARCHAR NOT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT,
         product_image_url VARCHAR(500) NOT NULL,
         scene_image_url VARCHAR(500),
         scene_video_url VARCHAR(500),
-        content_type VARCHAR(50) CHECK (content_type IN ('image', 'video')) NOT NULL,
+        content_type VARCHAR(50) DEFAULT 'image',
         video_duration_seconds INTEGER DEFAULT 5,
-        status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'enhancing_prompt', 'generating_image', 'generating_video', 'completed', 'failed')),
+        status VARCHAR(50) DEFAULT 'pending',
         progress INTEGER DEFAULT 0,
         enhanced_prompt TEXT,
         output_image_url VARCHAR(500),
@@ -53,29 +53,29 @@ export default async function handler(req, res) {
       )
     `;
 
-    // 3. Transactions Table - معاملات الدفع والأرصدة
+    // 3. Transactions Table (يعتمد على users)
     await sql`
       CREATE TABLE IF NOT EXISTS transactions (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id VARCHAR NOT NULL REFERENCES users(id),
+        user_id VARCHAR NOT NULL,
         amount INTEGER NOT NULL,
         credits INTEGER NOT NULL,
         stripe_payment_intent_id VARCHAR(255) UNIQUE,
-        status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed')),
+        status VARCHAR(50) DEFAULT 'pending',
         processed_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `;
 
-    // 4. Job Queue Table - معالجة المهام غير المتزامنة
+    // 4. Job Queue Table (يعتمد على users و projects)
     await sql`
       CREATE TABLE IF NOT EXISTS job_queue (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
         type VARCHAR(100) NOT NULL,
-        status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
-        project_id VARCHAR NOT NULL REFERENCES projects(id),
-        user_id VARCHAR NOT NULL REFERENCES users(id),
+        status VARCHAR(50) DEFAULT 'pending',
+        project_id VARCHAR NOT NULL,
+        user_id VARCHAR NOT NULL,
         priority INTEGER DEFAULT 0 NOT NULL,
         attempts INTEGER DEFAULT 0 NOT NULL,
         max_attempts INTEGER DEFAULT 3 NOT NULL,
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
       )
     `;
 
-    // 5. Sessions Table - إدارة الجلسات (اختياري)
+    // 5. Sessions Table (مستقل)
     await sql`
       CREATE TABLE IF NOT EXISTS sessions (
         sid VARCHAR PRIMARY KEY,
@@ -101,12 +101,36 @@ export default async function handler(req, res) {
       )
     `;
 
-    // Create indexes for better performance
+    // إضافة foreign key constraints بعد إنشاء كل الجداول
+    await sql`
+      ALTER TABLE projects 
+      ADD CONSTRAINT IF NOT EXISTS fk_projects_user_id 
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    `;
+
+    await sql`
+      ALTER TABLE transactions 
+      ADD CONSTRAINT IF NOT EXISTS fk_transactions_user_id 
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    `;
+
+    await sql`
+      ALTER TABLE job_queue 
+      ADD CONSTRAINT IF NOT EXISTS fk_job_queue_user_id 
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    `;
+
+    await sql`
+      ALTER TABLE job_queue 
+      ADD CONSTRAINT IF NOT EXISTS fk_job_queue_project_id 
+      FOREIGN KEY (project_id) REFERENCES projects(id)
+    `;
+
+    // Create indexes
     await sql`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_job_queue_status ON job_queue(status)`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_job_queue_project_id ON job_queue(project_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions(expire)`;
 
     // Create admin user
@@ -125,7 +149,11 @@ export default async function handler(req, res) {
       success: true,
       message: 'Database setup completed successfully',
       tables_created: ['users', 'projects', 'transactions', 'job_queue', 'sessions'],
-      admin_user: 'admin@cgi-generator.com (password: admin123)'
+      admin_user: {
+        email: 'admin@cgi-generator.com',
+        password: 'admin123',
+        credits: 1000
+      }
     });
 
   } catch (error) {
