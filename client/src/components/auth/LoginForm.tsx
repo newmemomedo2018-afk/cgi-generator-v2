@@ -43,8 +43,8 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
       
       const data = await response.json();
       
-      if (data.token) {
-        localStorage.setItem('auth_token', data.token);
+      if (data.auth_token) {
+        localStorage.setItem('auth_token', data.auth_token);
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         
         toast({
