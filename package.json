@@ -2,6 +2,7 @@
   "name": "cgi-generator",
   "private": true,
   "scripts": {
-    "build": "cd client && npm install && npm run build"
+    "build": "npm run build:client",
+    "build:client": "vite build"
   }
 }
