@@ -19,12 +19,11 @@ export default async function handler(req, res) {
     }
     const buffer = Buffer.concat(chunks);
     
-    // Basic file validation
     if (!buffer || buffer.length === 0) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Configure Cloudinary (same as Express code)
+    // Configure Cloudinary
     const { v2: cloudinary } = await import('cloudinary');
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -35,12 +34,6 @@ export default async function handler(req, res) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const publicId = `user-uploads/${uniqueSuffix}`;
 
-    console.log("Uploading to Cloudinary:", {
-      fileSize: buffer.length,
-      publicId
-    });
-
-    // Upload to Cloudinary (same logic as Express)
     const cloudinaryResult = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(
         {
@@ -51,15 +44,8 @@ export default async function handler(req, res) {
         },
         (error, result) => {
           if (error) {
-            console.error("Cloudinary upload error:", error);
             reject(error);
           } else {
-            console.log("Cloudinary upload success:", {
-              public_id: result.public_id,
-              url: result.secure_url,
-              format: result.format,
-              bytes: result.bytes
-            });
             resolve(result);
           }
         }
@@ -70,13 +56,6 @@ export default async function handler(req, res) {
       url: cloudinaryResult.secure_url,
       imageUrl: cloudinaryResult.secure_url,
       publicId: cloudinaryResult.public_id
-    });
-
-  } catch (error) {
-    console.error("Error uploading file:", error);
-    res.status(500).json({ error: "Failed to upload file" });
-  }
-}
     });
 
   } catch (error) {
