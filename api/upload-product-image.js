@@ -77,3 +77,10 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Failed to upload file" });
   }
 }
+    });
+
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    res.status(500).json({ error: "Failed to upload file" });
+  }
+}
