@@ -2,6 +2,10 @@
   "name": "cgi-generator-api",
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "build": "cd client && npm install && npm run build",
+    "start": "echo 'API functions ready'"
+  },
   "dependencies": {
     "jsonwebtoken": "^9.0.2",
     "bcryptjs": "^2.4.3"
